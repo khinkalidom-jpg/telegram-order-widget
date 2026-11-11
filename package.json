@@ -1,0 +1,19 @@
+{
+  "name": "bloom-telegram-widget",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.10.0"
+  },
+  "scripts": {
+    "start": "node --use-env-proxy --env-file-if-exists=.env src/bot.js",
+    "preview": "node src/preview.js",
+    "test": "node --test",
+    "check:sizes": "node src/sizes.js",
+    "test:browser": "node scripts/browser-check.js"
+  },
+  "devDependencies": {
+    "playwright": "1.58.2"
+  }
+}
