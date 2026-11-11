@@ -68,9 +68,9 @@ including through old catalogue messages.
 Set `ADMIN_USER_ID` to the owner's numeric Telegram **user** ID. `/id` reports both
 user and chat IDs. Set `ADMIN_CHAT_ID` separately for queued order notifications.
 The administrator must first open the bot. Without ADMIN_USER_ID the studio is
-closed; without ADMIN_CHAT_ID notifications remain queued. Neither was configured
-during this implementation, so live owner access and notification delivery have
-not been verified.
+closed; without ADMIN_CHAT_ID notifications remain queued. The owner was confirmed and admin access was enabled in the running bot process.
+Published environment values should also be applied when launching a fresh cloud
+instance; the current instance can retain its older environment snapshot.
 
 Owner: send `/admin`, choose **Add bouquet**, send name, description, GEL price
 (e.g. `120.00`), then a normal Telegram photo. Review the photo and choose **Publish**
@@ -81,36 +81,48 @@ must be at least 100×100; names are limited to 48 characters, descriptions to 1
 and prices to 1–100000 GEL. Only upload photographs you have permission to use.
 Products and photo file IDs are stored in SQLite and require no restart.
 
-### Photography: explicitly incomplete
+### Generated boutique imagery
 
-No stock photographs have been imported or licensed in this change. A request to
-`https://commons.wikimedia.org/w/api.php?action=query` returned HTTP 403 under the
-current network policy. Wikimedia discovery and original files need
-`commons.wikimedia.org` and `upload.wikimedia.org`. No network settings were changed.
-Consequently there are **no photo sources or license grants to claim**. The four
-seed bouquets keep IDs r/t/w/b and prices 120/85/110/180 GEL, with neutral descriptions
-and an explicit Photography pending label. There is no fake photo or external URL
-inside the widget. Complete photography using the owner upload flow, or obtain
-network access and document the source URL, author and license for each chosen image.
+The four PNG files in `assets/bouquets/` were generated with OpenAI image generation
+on 12 November 2026 for this demo. They are generated product illustrations, not
+photographs of actual stock or third-party stock photographs. No external stock
+license is asserted. The original generator PNGs are preserved without manual
+retouching. Each is 1122 × 1402 px (approximately 4:5), with a complete bouquet,
+neutral studio background and consistent ivory wrapping. `manifest.json` maps
+r/red roses, t/pink tulips, w/white roses and b/cream-blush mixed bouquet to files,
+names and descriptions. IDs, prices and historical order snapshots are preserved.
 
-Photo delivery uses sendPhoto and existing Telegram file IDs; navigation uses
-editMessageMedia and editMessageWidgetData, with persistent session/message links.
-The photo transport has mock coverage but has not been tested with a real uploaded
-bouquet photo. With no configured photo the bot sends only the widget. A new view
-with a configured photo sends the photo before its widget. A photo added to an
-already-open photo-less view appears as a new photo message; subsequent navigation
-edits that photo. Missing-photo transitions remove only that view's photo to avoid
-showing a photograph of the wrong bouquet; chat history is not bulk-deleted.
+`node --use-env-proxy scripts/upload-bouquets.js` is an explicit one-time upload
+operation requiring BOT_TOKEN, DATABASE_PATH and ADMIN_CHAT_ID. It uploads the
+files with multipart sendPhoto and saves Telegram file_id values in SQLite. Do not
+run it automatically at startup. All four real uploads returned HTTP 200, and live
+editMessageMedia navigation was checked against Telegram file_unique_id values.
+No file IDs, credentials or database contents are committed to Git.
+
+The photo remains a separate Telegram message, above its HTML widget; the gallery
+is not embedded in HTML. Navigation edits the linked photo and widget state. The
+local preview now uses the same generated images with the same manifest mapping,
+and labels itself as a local preview, not a Telegram or iPhone verification.
+
+The luxury storefront uses a fixed warm-white background, near-black text, fine
+rules and restrained system/serif typography. Quantity selection is local until
+ADD TO BAG; that operation applies the chosen quantity atomically with the existing
+revision/replay protection. Bag edits, price reconfirmation and order persistence
+retain the existing server-side protections. The storefront intentionally remains
+white inside Telegram's dark surrounding chrome as well.
 
 `npm test` covers legacy ordering plus sessions, permissions, editing, availability,
 price changes, replay and limits. `npm run preview` is a local composition preview
-with the same server session logic in an in-memory database. Its photo slot is
-explicitly empty, not a simulated real photo. `npm run test:browser` checks Chromium
+with the same server session logic in an in-memory database. Its photo message is represented by the actual generated asset above the widget. `npm run test:browser` checks Chromium
 at widths 320 and 430, both themes, checkout and Shop again. This is not an iPhone test.
-The storefront is 5622 bytes raw / about 2396 bytes zlib level 9; screen data is
+The storefront is 6129 bytes raw / 2639 bytes zlib level 9; screen data is
 checked against 1024 bytes, requests against 64 bytes. Catalogue size is independent
 of HTML size. Full carts/orders remain server-side and are paginated on screen.
 
 API references checked: https://core.telegram.org/bots/widgets,
 https://core.telegram.org/bots/api, https://core.telegram.org/bots/features.
 No payments, addresses, Mini App, external storefront or hosting changes were added.
+
+Luxury update validation: 31 Node tests pass; Chromium checks pass at 320/430 px,
+including photo navigation, light/dark surrounding chrome, checkout and new session.
+Real iPhone rendering of this new design still requires user verification.
