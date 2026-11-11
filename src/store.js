@@ -20,7 +20,7 @@ export class Store {
       if (!catalog || catalog.owner !== String(owner)) throw new Error('This catalog belongs to another customer.');
       let order = this.db.prepare('SELECT * FROM orders WHERE chat=? AND message=?').get(String(chat), message);
       if (!order) {
-        const body = JSON.stringify(parseCart(payload));
+        const body = JSON.stringify(parseCart(payload, this.db.prepare("SELECT name FROM sqlite_master WHERE name='products'").get() ? this.db.prepare('SELECT * FROM products').all() : undefined));
         const { lastInsertRowid } = this.db.prepare('INSERT INTO orders(chat,message,owner,body) VALUES(?,?,?,?)').run(String(chat), message, String(owner), body);
         for (const kind of ['widget', 'admin']) this.db.prepare('INSERT INTO jobs(order_id,kind) VALUES(?,?)').run(lastInsertRowid, kind);
         order = this.db.prepare('SELECT * FROM orders WHERE id=?').get(lastInsertRowid);

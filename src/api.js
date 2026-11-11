@@ -9,7 +9,7 @@ export function createApi(token) {
     } catch { throw new TelegramError('network-or-timeout'); }
     let data;
     try { data = await response.json(); } catch { throw new TelegramError(response.status); }
-    if (!response.ok || !data.ok) throw new TelegramError(data.error_code || response.status, data.parameters?.retry_after || 0);
+    if (!response.ok || !data.ok) { const e = new TelegramError(data.error_code || response.status, data.parameters?.retry_after || 0); e.notModified = /message is not modified/i.test(data.description || ""); throw e; }
     return data.result;
   };
 }

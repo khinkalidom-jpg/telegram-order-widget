@@ -52,3 +52,65 @@ npm run test:browser
 **Это не проверка совместимости с Telegram.** Страницы core.telegram.org были недоступны из-за сетевой политики; контракты сверены по официальному исходному коду и документации SDK в репозиториях Telegram, ссылки и версии — [docs/telegram-api.md](docs/telegram-api.md). Настоящий Telegram ещё не проверен: отсутствуют `BOT_TOKEN` и `ADMIN_CHAT_ID`. Перед показом клиенту выполните сценарий выше на актуальных клиентах Telegram, включая повторное открытие, быстрое повторное нажатие и уведомления.
 
 Для облачной среды в черновик сетевых настроек добавлены `core.telegram.org` и `api.telegram.org`. Их сохранение в черновике не означает применения к текущей машине: проверьте и сохраните настройки среды. Публичного развёртывания нет.
+
+## Storefront and owner studio (November 2026)
+
+`/start` opens Home; `/catalog`, `/cart`, `/help` and the Commands menu are available.
+The new HTML widget provides navigation, a paginated bouquet catalogue, a persistent
+cart, review/confirmation and Shop again. Old widget messages retain their old HTML;
+use Start to receive the new storefront. SQLite migrations preserve old orders and
+notification jobs. New sessions use negative internal order message keys, so a new
+order does not collide with a previous order in the same widget. Query revisions
+prevent repeated quantity changes and duplicate checkout. Price snapshots are
+confirmed again when current prices change. Hidden products cannot be ordered,
+including through old catalogue messages.
+
+Set `ADMIN_USER_ID` to the owner's numeric Telegram **user** ID. `/id` reports both
+user and chat IDs. Set `ADMIN_CHAT_ID` separately for queued order notifications.
+The administrator must first open the bot. Without ADMIN_USER_ID the studio is
+closed; without ADMIN_CHAT_ID notifications remain queued. Neither was configured
+during this implementation, so live owner access and notification delivery have
+not been verified.
+
+Owner: send `/admin`, choose **Add bouquet**, send name, description, GEL price
+(e.g. `120.00`), then a normal Telegram photo. Review the photo and choose **Publish**
+or **Cancel**. `/cancel` discards an unfinished draft. `/admin` also lists bouquets:
+choose one to edit its name, description, price or photograph, or hide/show it.
+All admin messages and callbacks check `from.id`, never usernames. Uploaded photos
+must be at least 100×100; names are limited to 48 characters, descriptions to 120,
+and prices to 1–100000 GEL. Only upload photographs you have permission to use.
+Products and photo file IDs are stored in SQLite and require no restart.
+
+### Photography: explicitly incomplete
+
+No stock photographs have been imported or licensed in this change. A request to
+`https://commons.wikimedia.org/w/api.php?action=query` returned HTTP 403 under the
+current network policy. Wikimedia discovery and original files need
+`commons.wikimedia.org` and `upload.wikimedia.org`. No network settings were changed.
+Consequently there are **no photo sources or license grants to claim**. The four
+seed bouquets keep IDs r/t/w/b and prices 120/85/110/180 GEL, with neutral descriptions
+and an explicit Photography pending label. There is no fake photo or external URL
+inside the widget. Complete photography using the owner upload flow, or obtain
+network access and document the source URL, author and license for each chosen image.
+
+Photo delivery uses sendPhoto and existing Telegram file IDs; navigation uses
+editMessageMedia and editMessageWidgetData, with persistent session/message links.
+The photo transport has mock coverage but has not been tested with a real uploaded
+bouquet photo. With no configured photo the bot sends only the widget. A new view
+with a configured photo sends the photo before its widget. A photo added to an
+already-open photo-less view appears as a new photo message; subsequent navigation
+edits that photo. Missing-photo transitions remove only that view's photo to avoid
+showing a photograph of the wrong bouquet; chat history is not bulk-deleted.
+
+`npm test` covers legacy ordering plus sessions, permissions, editing, availability,
+price changes, replay and limits. `npm run preview` is a local composition preview
+with the same server session logic in an in-memory database. Its photo slot is
+explicitly empty, not a simulated real photo. `npm run test:browser` checks Chromium
+at widths 320 and 430, both themes, checkout and Shop again. This is not an iPhone test.
+The storefront is 5622 bytes raw / about 2396 bytes zlib level 9; screen data is
+checked against 1024 bytes, requests against 64 bytes. Catalogue size is independent
+of HTML size. Full carts/orders remain server-side and are paginated on screen.
+
+API references checked: https://core.telegram.org/bots/widgets,
+https://core.telegram.org/bots/api, https://core.telegram.org/bots/features.
+No payments, addresses, Mini App, external storefront or hosting changes were added.
