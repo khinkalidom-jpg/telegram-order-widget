@@ -10,7 +10,9 @@ export class Store {
       CREATE TABLE IF NOT EXISTS catalogs(chat TEXT NOT NULL, message INTEGER NOT NULL, owner TEXT NOT NULL, PRIMARY KEY(chat,message));
       CREATE TABLE IF NOT EXISTS orders(id INTEGER PRIMARY KEY AUTOINCREMENT, chat TEXT NOT NULL, message INTEGER NOT NULL, owner TEXT NOT NULL, body TEXT NOT NULL, created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(chat,message));
       CREATE TABLE IF NOT EXISTS jobs(order_id INTEGER NOT NULL, kind TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_at INTEGER NOT NULL DEFAULT 0, done INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(order_id,kind));
+      CREATE TABLE IF NOT EXISTS order_status(order_id INTEGER PRIMARY KEY,status TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
+    if(!this.db.prepare('PRAGMA table_info(jobs)').all().some(c=>c.name==='last_error'))this.db.exec("ALTER TABLE jobs ADD COLUMN last_error TEXT NOT NULL DEFAULT ''");
   }
   register(chat, message, owner) { this.db.prepare('INSERT INTO catalogs VALUES(?,?,?)').run(String(chat), message, String(owner)); }
   place(chat, message, owner, payload) {
@@ -31,7 +33,7 @@ export class Store {
   }
   due() { return this.db.prepare('SELECT j.*,o.chat,o.message,o.owner,o.body FROM jobs j JOIN orders o ON o.id=j.order_id WHERE done=0 AND next_at<=? ORDER BY next_at LIMIT 10').all(Date.now()); }
   done(job) { this.db.prepare('UPDATE jobs SET done=1 WHERE order_id=? AND kind=?').run(job.order_id, job.kind); }
-  retry(job, delay) { this.db.prepare('UPDATE jobs SET attempts=attempts+1,next_at=? WHERE order_id=? AND kind=?').run(Date.now() + delay, job.order_id, job.kind); }
+  retry(job, delay, reason='') { this.db.prepare('UPDATE jobs SET attempts=attempts+1,next_at=?,last_error=? WHERE order_id=? AND kind=?').run(Date.now() + delay, reason, job.order_id, job.kind); }
   offset(value) {
     if (value !== undefined) this.db.prepare("INSERT INTO metadata VALUES('offset',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(String(value));
     return Number(this.db.prepare("SELECT value FROM metadata WHERE key='offset'").get()?.value || 0);

@@ -6,6 +6,8 @@ import {adminUpdate} from './admin.js';
 import {commands,words} from './i18n.js';
 import {ui} from './config.js';
 const token=process.env.BOT_TOKEN,admin=process.env.ADMIN_CHAT_ID;
+if(!admin)console.warn('ADMIN_CHAT_ID missing: order notifications will remain queued.');
+if(!process.env.ADMIN_USER_ID)console.warn('ADMIN_USER_ID missing: administrator access disabled.');
 if(!token){console.error('BOT_TOKEN is required.');process.exit(1)}
 if(admin&&!/^-?\d+$/.test(admin)){console.error('ADMIN_CHAT_ID must be numeric.');process.exit(1)}
 const store=new ShopStore(process.env.DATABASE_PATH||'./data/bloom.sqlite'),api=createApi(token);

@@ -190,8 +190,7 @@ in `/workspace/bloom-backups/`, outside this repository; it is not committed.
 Migration checks on the live database verified unchanged orders, products (including
 prices/photo IDs), notification jobs, sessions and admin drafts. Native Telegram
 API verification sent one photo card and successfully edited it four times with
-matching caption and inline buttons; Home was also delivered. Live constructor
-prices remain unset, so no real constructor order or stock availability is claimed.
+matching caption and inline buttons; Home was also delivered. Constructor prices are owner-configured in SQLite. No stock availability is claimed.
 
 Run `npm test`. For browser checks, run
 `PREVIEW_ROSE_FIXTURES=1 npm run preview`, then `npm run test:browser`.
@@ -203,3 +202,44 @@ bag rows, confirmation and keypad 1/2/37/1000 with no per-digit server requests.
 This is **not an iPhone verification**. Official contracts checked:
 https://core.telegram.org/bots/api/methods/editmessagemedia.md and
 https://core.telegram.org/bots/widgets.md.
+
+
+### Order timing and visible navigation
+
+Widget actions now render before acknowledging completion and return the actual
+screen (rather than `{ok:true}`). Same-language/current-version widgets update
+with `editMessageWidgetData`; entering the catalogue sends a fresh photo at the
+bottom of the chat. Previous/Next edit that active photo. Old revisions are
+rejected or return current state without replaying the action. HTML version 2
+replaces older deployed documents on navigation, retaining the bag.
+
+Checkout requires ASAP or a future one-hour interval in **Asia/Tbilisi**.
+Dates extend 90 days ahead; day/week controls select the date. Owner settings:
+`/admin` → desired time → preparation minutes, opening hour, closing hour.
+Defaults: **60 minutes**, **09:00–20:00**. These are demo scheduling defaults;
+the owner should set the actual hours. Time is a request, not a readiness promise.
+Past intervals and changed prices are checked again at confirmation. Existing
+orders without a desired time remain intact.
+
+### Manager delivery and statuses
+
+Set both `ADMIN_USER_ID` and `ADMIN_CHAT_ID` in the process environment (or the
+ignored local `.env` read by `npm start`). The former alone grants authority.
+Missing values are reported at startup; delivery failures retain a sanitized
+`jobs.last_error` and exponential retry. No credentials are logged.
+
+The existing `admin` job sends a separate ADMIN-labelled message, even when
+customer and owner are the same person. Owner-only callbacks persist the status
+and queue `status:accepted`, `status:ready`, or `status:cancelled` in the same jobs
+table. Allowed transitions are pending → accepted → ready, or cancellation from
+pending/accepted. Unique jobs prevent repeated clicks or ordinary restarts from
+sending another notification. Telegram sendMessage has no idempotency key: a
+process crash after Telegram accepted a send but before SQLite recorded success
+is an unavoidable ambiguous-delivery window; strict exactly-once transport is
+not claimed. Successful chunk progress and completed jobs are persisted.
+
+Official API contract checked: https://core.telegram.org/bots/api#answerwidgetquery
+(15-second answer deadline; the answer does not persist chat_data).
+UI/state/request budgets remain 32 KiB / 4 KiB compressed, 1024 bytes / 64 bytes.
+The checkout and status tests use a separate local SQLite for live API probes;
+production orders/products/rose settings are compared unchanged.
