@@ -3,7 +3,14 @@ import {randomUUID} from 'node:crypto';
 import {adminText as defaults,money} from './config.js';
 export function authorized(from,id){return !!id&&/^[1-9]\d*$/.test(String(id))&&Number.isSafeInteger(Number(id))&&String(from?.id)===String(id)}
 export function priceValue(text){if(!/^\d{1,6}(\.\d{1,2})?$/.test(text))throw Error(defaults.invalid);const [a,b='']=text.split('.');const n=Number(a)*100+Number(b.padEnd(2,'0'));if(n<100||n>10000000)throw Error(defaults.invalid);return n}
-export async function adminUpdate(u,store,api,admin){const cb=u.callback_query,m=u.message,from=cb?.from||m?.from,chat=cb?.message?.chat||m?.chat;
+export async function adminUpdate(u,store,api,admin,botUsername){const cb=u.callback_query,m=u.message,from=cb?.from||m?.from,chat=cb?.message?.chat||m?.chat;
+ // Customer navigation leaves only this sender's unfinished input behind.
+ // Published products and builder settings are never changed by this exit.
+ const [command,mention]=(m?.text?.trim().split(/\s+/)[0]||'').split('@');
+ if(m&&chat?.type==='private'&&from?.id&&['/start','/catalog','/cart','/help','/builder','/id'].includes(command)&&(!mention||mention.toLowerCase()===botUsername?.toLowerCase())){
+  store.db.prepare('DELETE FROM admin_drafts WHERE owner=?').run(String(from.id));
+  return false;
+ }
  const l=store.lang(from?.id),t={...defaults,...adminWords[l]},w=words[l];
  const existing=from&&store.db.prepare('SELECT body FROM admin_drafts WHERE owner=?').get(String(from.id));
  if(!(cb?.data?.startsWith('adm:')||m?.text==='/admin'||m?.text==='/cancel'||existing))return false;
