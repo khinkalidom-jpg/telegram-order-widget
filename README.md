@@ -126,3 +126,80 @@ No payments, addresses, Mini App, external storefront or hosting changes were ad
 Luxury update validation: 31 Node tests pass; Chromium checks pass at 320/430 px,
 including photo navigation, light/dark surrounding chrome, checkout and new session.
 Real iPhone rendering of this new design still requires user verification.
+
+## Current UX: native catalogue, list bag, rose builder, three languages
+
+This section supersedes the earlier single-product widget / photo-pair description.
+The ready-made catalogue is now **one native photo message with inline buttons**.
+Next/Previous edits that same message with one `editMessageMedia` call containing
+photo, caption and keyboard. Telegram controls native button appearance; the app
+cannot make them white with CSS. Each callback carries a session revision and the
+product ID. The handler checks the owner, chat, message, delivered revision and
+current product, and serializes delivery per session. Failed delivery keeps the
+old coherent card and marks the new state for retry; old actions cannot add the
+new product by accident. Adding stays in the catalogue and updates the bag count.
+
+Home, bag, receipt and builder use compact HTML widgets. Bags show a list of all
+rows, with individual minus/plus/remove controls. Four normal ready-made rows fit
+one widget; larger or longer UTF-8 lists continue in sequential widget messages.
+No one-product carousel or selected-product photo accompanies the bag. State
+blocks are limited to 1024 UTF-8 bytes, and layouts are split to fit Telegram's
+600 px height limit. Historical messages keep their HTML; inactive views reject
+mutations, and `/start` opens the current UI. Order snapshots and retry jobs remain
+intact. Notification snapshots now include the known name, username and ID (only
+when supplied by Telegram), all rows and rose parameters. Multipart notification
+progress is persisted so a retry can resume after the last successful part.
+
+### Owner setup required: rose builder prices
+
+No commercial rose or wrapping prices have been invented. The live migration
+creates disabled colour/wrapping options with **NULL prices**, independent of the
+four ready-made bouquet prices. As the configured owner:
+
+1. `/admin` → **Rose builder settings** (localized into Russian / Georgian).
+2. Select each offered colour and enter its **GEL price per stem**.
+3. Select wrapping and enter its separate GEL price; enter **0** deliberately if
+   wrapping is included or free. Enable/disable options with their controls.
+4. Optionally adjust minimum/maximum stems (defaults **1–1000**, inclusive).
+
+The builder is unavailable for ordering until both a priced colour and wrapping
+are enabled. Server formula: stems × current stem price + current wrapping price.
+The numeric keypad accepts any integer in range, including 1, 2, 37 and 1000;
+individual digit taps remain local. Stems per composition and the number of
+compositions in the bag are separate values. Distinct configurations are separate
+rows. Changed prices require a fresh confirmation. No bulk stock is promised.
+`ADMIN_USER_ID` remains the sole source of administrative authority;
+`ADMIN_CHAT_ID` is only the notification recipient. Invalid/missing owner IDs deny
+commands, callbacks, photo uploads, editing steps and foreign drafts.
+
+### Languages and new product translations
+
+Russian, Georgian and English are supported. Home has a visible language switch.
+The initial language follows Telegram's `language_code` with English fallback;
+manual choice is stored in SQLite and wins over automatic detection. Switching
+language preserves the bag and orders. Each HTML document includes just one
+language dictionary. Commands and bot descriptions have localized registrations.
+The four original products have Russian and Georgian names/descriptions. For a
+new product, `/admin` → product → **Translations** edits name/description per
+language. Missing translations safely fall back to the owner's original text.
+
+### Validation and backup
+
+A local SQLite backup was created with SQLite's backup API **before migration**
+in `/workspace/bloom-backups/`, outside this repository; it is not committed.
+Migration checks on the live database verified unchanged orders, products (including
+prices/photo IDs), notification jobs, sessions and admin drafts. Native Telegram
+API verification sent one photo card and successfully edited it four times with
+matching caption and inline buttons; Home was also delivered. Live constructor
+prices remain unset, so no real constructor order or stock availability is claimed.
+
+Run `npm test`. For browser checks, run
+`PREVIEW_ROSE_FIXTURES=1 npm run preview`, then `npm run test:browser`.
+The preview uses an isolated in-memory database; its explicit TEST prices never
+reach production. Without that flag it mirrors the unconfigured constructor.
+The preview distinguishes native-photo approximations from HTML widgets.
+Chromium checks cover 320/390/430 px in ru/ka/en, native navigation, four simultaneous
+bag rows, confirmation and keypad 1/2/37/1000 with no per-digit server requests.
+This is **not an iPhone verification**. Official contracts checked:
+https://core.telegram.org/bots/api/methods/editmessagemedia.md and
+https://core.telegram.org/bots/widgets.md.

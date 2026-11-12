@@ -24,7 +24,12 @@ export async function drainJobs(store, api, admin) {
       if(job.kind==='widget') await api('editMessageWidgetData',{chat_id:job.chat,message_id:job.message,chat_data:JSON.stringify(receipt({id:job.order_id,...body}))});
       else {
         if(!admin) throw new Error('Admin not configured');
-        await api('sendMessage',{chat_id:admin,text:`DEMO · BLOOM #${job.order_id}\nCustomer ID: ${job.owner}\n${body.items.map(p=>`${p.quantity} × ${p.name} — ${money(p.quantity*p.price)}`).join('\n')}\nTotal: ${money(body.total)}\nNo payment or delivery.`});
+        const customer=body.customer||{id:job.owner};
+        const lines=[`DEMO · BLOOM #${job.order_id}`,...(customer.name?[customer.name]:[]),...(customer.username?['@'+customer.username]:[]),`Customer ID: ${customer.id}`,...body.items.map(p=>`${p.quantity} × ${p.name}${p.params?` (${p.params.stems} stems; ${p.params.color}; ${p.params.wrap})`:''} — ${money(p.quantity*p.price)}`),`Total: ${money(body.total)}`,'No payment or delivery.'];
+        const chunks=[];let text='';for(const line of lines){if((text+'\n'+line).length>3500){chunks.push(text);text=''}text+=(text?'\n':'')+line}if(text)chunks.push(text);
+        store.db.exec('CREATE TABLE IF NOT EXISTS notification_parts(order_id INTEGER PRIMARY KEY,next_part INTEGER DEFAULT 0)');
+        const start=store.db.prepare('SELECT next_part FROM notification_parts WHERE order_id=?').get(job.order_id)?.next_part||0;
+        for(let i=start;i<chunks.length;i++){await api('sendMessage',{chat_id:admin,text:chunks[i]});store.db.prepare('INSERT INTO notification_parts VALUES(?,?) ON CONFLICT(order_id) DO UPDATE SET next_part=excluded.next_part').run(job.order_id,i+1)}
       }
       store.done(job);
     } catch(e) {
