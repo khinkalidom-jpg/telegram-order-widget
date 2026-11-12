@@ -28,7 +28,32 @@ export async function renderSession(store,api,id,fresh=false){const s=store.sess
  }
  if(store.session(id).rev===s.rev)store.db.prepare('UPDATE ui_state SET dirty=0 WHERE session=?').run(id);
 }
-export async function openView(store,api,owner,chat,screen,from){if(from)store.observe(from);const s=store.open(owner,chat,screen);await serial(String(s.id),()=>renderSession(store,api,s.id,true));await menu(store,api,s);return s}
+// Only consecutive commands with an unchanged, successfully displayed screen
+// are coalesced. Persist the receipt before optional command-menu registration.
+export async function openView(store,api,owner,chat,screen,from,{now=Date.now(),updateId}={}){
+ const key=JSON.stringify(['command',String(owner),String(chat)]);
+ return serial(key,async()=>{
+  if(from)store.observe(from);
+  const latest=store.db.prepare('SELECT id FROM sessions WHERE owner=? AND chat=? ORDER BY id DESC LIMIT 1').get(String(owner),String(chat));
+  return serial(String(latest?.id||'new:'+key),async()=>{
+   const previous=JSON.parse(store.db.prepare('SELECT value FROM metadata WHERE key=?').get(key)?.value||'null');
+   const current=latest&&store.session(latest.id);
+   const consecutive=updateId===undefined||previous?.updateId===updateId||store.offset()===previous?.updateId+1;
+   const displayed=current&&store.db.prepare('SELECT 1 FROM views WHERE session=? AND active=1 UNION ALL SELECT 1 FROM cards WHERE session=? AND active=1 LIMIT 1').get(current.id,current.id);
+   let s=current;
+   if(!(previous&&consecutive&&now>=previous.at&&now-previous.at<60000&&previous.screen===screen&&current?.screen===screen&&previous.session===current.id&&previous.rev===current.rev&&displayed)){
+    s=store.open(owner,chat,screen);
+    if(s.id===latest?.id)await renderSession(store,api,s.id,true);
+    else await serial(String(s.id),()=>renderSession(store,api,s.id,true));
+    store.db.prepare('INSERT INTO metadata VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key,JSON.stringify({screen,session:s.id,rev:s.rev,at:now,updateId}));
+   }else if(updateId!==undefined){
+    // Advance the update chain without extending the original debounce window.
+    store.db.prepare('UPDATE metadata SET value=? WHERE key=?').run(JSON.stringify({...previous,updateId}),key);
+   }
+   await menu(store,api,s);return s;
+  });
+ });
+}
 export async function cardCallback(q,store,api){if(!q.data?.startsWith('["c",'))return false;let a;try{a=JSON.parse(q.data)}catch{return false}const [,id,rev,act,product]=a;await serial(String(id),async()=>{
  const s=store.session(id),l=store.lang(q.from.id);try{
  const c=store.db.prepare('SELECT * FROM cards WHERE chat=? AND message=?').get(String(q.message?.chat?.id),q.message?.message_id);

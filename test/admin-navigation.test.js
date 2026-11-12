@@ -21,8 +21,8 @@ test('exit never clears another user draft or a command addressed to another bot
  assert.equal(await adminUpdate({message:{from:{id:2},chat:{id:2,type:'private'},text:'/start'}},s,async()=>{},'1','BloomOrderDemoBot'),false);assert.equal(s.db.prepare('SELECT body FROM admin_drafts WHERE owner=?').get('1').body,draft);
  await adminUpdate({message:{from:{id:1},chat:{id:1,type:'private'},text:'/start@AnotherBot'}},s,async()=>{},'1','BloomOrderDemoBot');assert.equal(s.db.prepare('SELECT body FROM admin_drafts WHERE owner=?').get('1').body,draft);s.close();
 });
-test('explicit customer commands send fresh replies instead of editing messages above the admin conversation',async()=>{
+test('consecutive identical commands reuse their fresh reply',async()=>{
  const s=new ShopStore(':memory:');for(const p of s.products())s.saveProduct({...p,photo:'file-'+p.id});const calls=[];let message=200;const api=async(m,p)=>{calls.push([m,p]);return {message_id:++message}};
- await openView(s,api,1,1,'home');await openView(s,api,1,1,'home');assert.equal(calls.filter(c=>c[0]==='sendWidget').length,2);assert.equal(s.db.prepare('SELECT COUNT(*) n FROM views WHERE active=1').get().n,1);
- await openView(s,api,1,1,'catalog');await openView(s,api,1,1,'catalog');assert.equal(calls.filter(c=>c[0]==='sendPhoto').length,2);assert.equal(s.db.prepare('SELECT COUNT(*) n FROM cards WHERE active=1').get().n,1);assert.equal(calls.filter(c=>c[0].startsWith('editMessage')).length,0);s.close();
+ await openView(s,api,1,1,'home');await openView(s,api,1,1,'home');assert.equal(calls.filter(c=>c[0]==='sendWidget').length,1);assert.equal(s.db.prepare('SELECT COUNT(*) n FROM views WHERE active=1').get().n,1);
+ await openView(s,api,1,1,'catalog');await openView(s,api,1,1,'catalog');assert.equal(calls.filter(c=>c[0]==='sendPhoto').length,1);assert.equal(s.db.prepare('SELECT COUNT(*) n FROM cards WHERE active=1').get().n,1);assert.equal(calls.filter(c=>c[0].startsWith('editMessage')).length,0);s.close();
 });
